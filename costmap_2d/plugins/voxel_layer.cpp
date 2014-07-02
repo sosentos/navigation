@@ -54,6 +54,11 @@ void VoxelLayer::reconfigureCB(costmap_2d::VoxelPluginConfig &config, uint32_t l
   clear_old_ = !rolling_window_ && config.clear_old; 
   if(clear_old_)
     ROS_INFO("Clearing old obstacles : %d - Rolling %d", config.clear_old, rolling_window_);
+
+  if(config.clear_old && rolling_window_){
+    ROS_WARN("Unable to clear old obstacles for maps with a rolling window");
+  }
+
   max_obstacle_persistance_ = config.max_obstacle_persistance; 
   matchSize();
 }
@@ -137,8 +142,6 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
   //update the global current status
   current_ = current;
 
-  double current_time = ros::Time::now().toSec();
-
   //raytrace freespace
   for (unsigned int i = 0; i < clearing_observations.size(); ++i)
   {
@@ -150,17 +153,15 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
   {
     const Observation& obs = *it;
 
+    //we should throw out stale observations also 
+
     CostMapList cm_list; 
-    
     cm_list.obs_timestamp = obs.cloud_->header.stamp; 
-    
-    //fprintf(stdout, "Time delay: %f\n", current_time - obs.cloud_->header.stamp/1.0e6);
+    double obs_ts = cm_list.obs_timestamp / 1.0e6; 
 
     const pcl::PointCloud<pcl::PointXYZ>& cloud = *(obs.cloud_);
 
     double sq_obstacle_range = obs.obstacle_range_ * obs.obstacle_range_;
-
-    double obs_ts = cm_list.obs_timestamp / 1.0e6; 
 
     int count = 0; 
     
@@ -197,16 +198,14 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
         unsigned int index = getIndex(mx, my);
 	//these are the ones set as occupied 
 	costmap_[index] = LETHAL_OBSTACLE;
+	touch((double)cloud.points[i].x, (double)cloud.points[i].y, min_x, min_y, max_x, max_y);
 
+	//keep track of which indexs we updated 
 	if(clear_old_){
-	  //if rolling window - the indexs will get invalidated 
-	  //we will have to keep the x,y values 
 	  cm_list.indices.push_back(index);
 	  locations_utime[index] = obs_ts; 
 	  count++;
 	}
-
-	touch((double)cloud.points[i].x, (double)cloud.points[i].y, min_x, min_y, max_x, max_y);
       }
     }
     if(clear_old_ && count > 0){

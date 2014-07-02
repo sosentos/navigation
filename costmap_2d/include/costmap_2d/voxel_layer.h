@@ -56,17 +56,17 @@
 #include <voxel_grid/voxel_grid.h>
 namespace costmap_2d
 {
+  //keeps track of the indices updated for each observation
   class CostMapList {
   public:
-    //ros::Time obs_timestamp; 
     int64_t obs_timestamp; 
     std::vector<unsigned int> indices;
   };
 
+  //keeps track of the last time each index location was updated 
   class GridmapLocations {
   public:
-    //we should keep a second gridmap 
-    //map<unsigned int, int64_t> last_utime; 
+
     double *last_utimes;
     int size;
 

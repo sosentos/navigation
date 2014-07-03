@@ -159,6 +159,12 @@ namespace base_local_planner {
         return initialized_;
       }
 
+      void publishTest();
+
+      virtual bool isRotatingToGoal() {
+	return rotating_to_goal_;
+      }
+
       /** @brief Return the inner TrajectoryPlanner object.  Only valid after initialize(). */
       TrajectoryPlanner* getPlanner() const { return tc_; }
 
@@ -214,6 +220,7 @@ namespace base_local_planner {
       double acc_lim_x_, acc_lim_y_, acc_lim_theta_;
       double sim_period_;
       bool rotating_to_goal_;
+      bool reached_goal_;
       bool latch_xy_goal_tolerance_, xy_tolerance_latch_;
 
       ros::Publisher g_plan_pub_, l_plan_pub_;

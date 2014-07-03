@@ -159,6 +159,10 @@ namespace base_local_planner {
         return initialized_;
       }
 
+      virtual bool isRotatingToGoal() {
+	return rotating_to_goal_;
+      }
+
       /** @brief Return the inner TrajectoryPlanner object.  Only valid after initialize(). */
       TrajectoryPlanner* getPlanner() const { return tc_; }
 

@@ -370,6 +370,8 @@ namespace base_local_planner {
 
     //when we get a new plan, we also want to clear any latch we may have on goal tolerances
     xy_tolerance_latch_ = false;
+    //set rotating_to_goal flag to false 
+    rotating_to_goal_ = false;
 
     return true;
   }
@@ -454,15 +456,23 @@ namespace base_local_planner {
 
         //if we're not stopped yet... we want to stop... taking into account the acceleration limits of the robot
         if ( ! rotating_to_goal_ && !base_local_planner::stopped(base_odom, rot_stopped_velocity_, trans_stopped_velocity_)) {
+          //we should be rotating to goal - but we aren't - we also haven't stopped moving forward - issue a stop command
+          //calculate command to stop the robot
           if ( ! stopWithAccLimits(global_pose, robot_vel, cmd_vel)) {
+	    //can't stop in time, command is all zeros 
+            ROS_WARN("Local Planner : Unable to stop within given time");
             return false;
           }
         }
         //if we're stopped... then we want to rotate to goal
         else{
-          //set this so that we know its OK to be moving
+          //once we have stopped moving in xy or if we are already rotating in place 
+          //keep issuing rotate in place commands 
           rotating_to_goal_ = true;
           if(!rotateToGoal(global_pose, robot_vel, goal_th, cmd_vel)) {
+            //in this failure case, the planner will be called again to re-plan
+            ROS_WARN("Local Planner: Failed to rotate to goal");
+            rotating_to_goal_ = false;
             return false;
           }
         }
@@ -474,6 +484,10 @@ namespace base_local_planner {
 
       //we don't actually want to run the controller when we're just rotating to goal
       return true;
+    }
+    else{
+      //we are outside the xy tollerances - make sure rotating_to_goal is false
+      rotating_to_goal_ = false;
     }
 
     tc_->updatePlan(transformed_plan);

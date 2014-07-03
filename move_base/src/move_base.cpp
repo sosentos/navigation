@@ -929,6 +929,18 @@ namespace move_base {
                            cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z );
           last_valid_control_ = ros::Time::now();
           //make sure that we send the velocity command to the base
+          
+          if(tc_->isRotatingToGoal()){
+            //turn off the global planner - we don't need it anymore 
+            //disable the planner thread
+            boost::unique_lock<boost::mutex> lock(planner_mutex_);
+            if(runPlanner_){
+      	        //Robot turning towards goal - stopping global planner thread
+                runPlanner_ = false;
+            }
+            lock.unlock();
+          }
+
           vel_pub_.publish(cmd_vel);
           if(recovery_trigger_ == CONTROLLING_R)
             recovery_index_ = 0;

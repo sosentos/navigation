@@ -348,8 +348,8 @@ namespace base_local_planner {
     //we still want to lay down the footprint of the robot and check if the action is legal
     bool valid_cmd = tc_->checkTrajectory(global_pose.getOrigin().getX(), global_pose.getOrigin().getY(), yaw, 
         robot_vel.getOrigin().getX(), robot_vel.getOrigin().getY(), vel_yaw, 0.0, 0.0, v_theta_samp);
-
-    ROS_INFO("Moving to desired goal orientation, th cmd: %.2f, valid_cmd: %d -> Angle diff : %.3f", v_theta_samp, valid_cmd, ang_diff);
+    
+    ROS_DEBUG("Moving to desired goal orientation, th cmd: %.2f, valid_cmd: %d -> Angle diff : %.3f", v_theta_samp, valid_cmd, ang_diff);
 
     if(valid_cmd){
       cmd_vel.angular.z = v_theta_samp;
@@ -366,9 +366,6 @@ namespace base_local_planner {
       ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
       return false;
     }
-
-    //we could perhaps not update the plan if rotating in place??
-    //esp if the goal is the same 
 
     //reset the global plan
     global_plan_.clear();
@@ -436,6 +433,8 @@ namespace base_local_planner {
 
       //if the user wants to latch goal tolerance, if we ever reach the goal location, we'll
       //just rotate in place
+      ROS_DEBUG("Turning in place : Dist to Goal : %f", getGoalPositionDistance(global_pose, goal_x, goal_y));
+
       if (latch_xy_goal_tolerance_) {
         xy_tolerance_latch_ = true;
       }
@@ -452,7 +451,6 @@ namespace base_local_planner {
         rotating_to_goal_ = false;
         xy_tolerance_latch_ = false;
 	reached_goal_ = true;
-	ROS_WARN("Reached Goal - Setting rotate in place to zero Base goal reached : %d", base_is_goal_reached);
       } 
       else {
         //we need to call the next two lines to make sure that the trajectory
@@ -464,31 +462,25 @@ namespace base_local_planner {
 
 	//we should update the plan if we are not rotating to goal
 	if(!rotating_to_goal_ && !stopped){ 
+	  //calculate command to stop the robot
 	  if ( ! stopWithAccLimits(global_pose, robot_vel, cmd_vel)) {
-	    ROS_WARN("Unable to stop within given time");
+	    //unable to stop within the given time 
+	    ROS_WARN("Local Planner : Unable to stop within given time");
 	    return false;
-	  }
-	  else{
-	     ROS_INFO("Within goal xy tollerance and robot still moving - stopping robot");
 	  }
 	}	
         //if we're stopped... then we want to rotate to goal
         else{
-          //set this so that we know its OK to be moving
-          //rotating_to_goal_ = true;
-	  if(!rotating_to_goal_ && stopped){
-	    ROS_INFO("Robot within goal tollerance and stopped - Issuing turning in place");
+          //once we have stoped moving in xy or if we are already rotating in place 
+	  //keep issuing rotate in place commands 
+	  if(rotating_to_goal_ || (!rotating_to_goal_ && stopped)){
+	    if(!rotateToGoal(global_pose, robot_vel, goal_th, cmd_vel)) {
+	      ROS_WARN("Failed to rotate to goal");
+	      return false;
+	    }
+	    rotating_to_goal_ = true;
 	  }
-	  else if(rotating_to_goal_){
-	    ROS_INFO("Continuing to turn in place");
-	  }
-
-          if(!rotateToGoal(global_pose, robot_vel, goal_th, cmd_vel)) {
-	    ROS_INFO("Failed to rotate to goal");
-            return false;
-          }
-	  rotating_to_goal_ = true;
-        }
+	}
       }
 
       //publish an empty plan because we've reached our goal position

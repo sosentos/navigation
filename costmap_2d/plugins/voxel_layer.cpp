@@ -11,6 +11,7 @@ using costmap_2d::FREE_SPACE;
 
 using costmap_2d::ObservationBuffer;
 using costmap_2d::Observation;
+using namespace std;
 
 namespace costmap_2d
 {
@@ -154,7 +155,7 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
   {
     raytraceFreespace(clearing_observations[i], min_x, min_y, max_x, max_y);
   }
-
+   
   //place the new obstacles into a priority queue... each with a priority of zero to begin with
   for (std::vector<Observation>::const_iterator it = observations.begin(); it != observations.end(); ++it)
   {

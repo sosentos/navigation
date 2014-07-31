@@ -190,21 +190,26 @@ bool AMCLOdom::UpdateAction(pf_t *pf, AMCLSensorData *data)
     delta_rot2_noise = std::min(fabs(angle_diff(delta_rot2,0.0)),
                                 fabs(angle_diff(delta_rot2,M_PI)));
 
+    //precomputing std dev's 
+    double std_rot_1 = this->alpha1*delta_rot1_noise*delta_rot1_noise +
+      this->alpha2*delta_trans*delta_trans;
+
+    double std_trans = this->alpha3*delta_trans*delta_trans +
+      this->alpha4*delta_rot1_noise*delta_rot1_noise +
+      this->alpha4*delta_rot2_noise*delta_rot2_noise;
+
+    double std_rot_2 = this->alpha1*delta_rot2_noise*delta_rot2_noise +
+      this->alpha2*delta_trans*delta_trans;
+
     for (int i = 0; i < set->sample_count; i++)
     {
       pf_sample_t* sample = set->samples + i;
 
       // Sample pose differences
-      delta_rot1_hat = angle_diff(delta_rot1,
-                                  pf_ran_gaussian(this->alpha1*delta_rot1_noise*delta_rot1_noise +
-                                                  this->alpha2*delta_trans*delta_trans));
-      delta_trans_hat = delta_trans - 
-              pf_ran_gaussian(this->alpha3*delta_trans*delta_trans +
-                              this->alpha4*delta_rot1_noise*delta_rot1_noise +
-                              this->alpha4*delta_rot2_noise*delta_rot2_noise);
-      delta_rot2_hat = angle_diff(delta_rot2,
-                                  pf_ran_gaussian(this->alpha1*delta_rot2_noise*delta_rot2_noise +
-                                                  this->alpha2*delta_trans*delta_trans));
+      delta_rot1_hat = angle_diff(delta_rot1, pf_ran_gaussian(std_rot_1));
+      delta_trans_hat = delta_trans - pf_ran_gaussian(std_trans);
+      
+      delta_rot2_hat = angle_diff(delta_rot2, pf_ran_gaussian(std_rot_2));
 
       // Apply sampled update to particle pose
       sample->pose.v[0] += delta_trans_hat * 
@@ -283,21 +288,25 @@ bool AMCLOdom::UpdateAction(pf_t *pf, AMCLSensorData *data)
     delta_rot2_noise = std::min(fabs(angle_diff(delta_rot2,0.0)),
                                 fabs(angle_diff(delta_rot2,M_PI)));
 
+    //precomputing std dev's 
+    double std_rot_1 = sqrt(this->alpha1*delta_rot1_noise*delta_rot1_noise +
+			    this->alpha2*delta_trans*delta_trans);
+
+    double std_trans = sqrt(this->alpha3*delta_trans*delta_trans +
+			    this->alpha4*delta_rot1_noise*delta_rot1_noise +
+			    this->alpha4*delta_rot2_noise*delta_rot2_noise);
+
+    double std_rot_2 = sqrt(this->alpha1*delta_rot2_noise*delta_rot2_noise +
+			    this->alpha2*delta_trans*delta_trans);
+
     for (int i = 0; i < set->sample_count; i++)
     {
       pf_sample_t* sample = set->samples + i;
 
       // Sample pose differences
-      delta_rot1_hat = angle_diff(delta_rot1,
-                                  pf_ran_gaussian(sqrt(this->alpha1*delta_rot1_noise*delta_rot1_noise +
-                                                       this->alpha2*delta_trans*delta_trans)));
-      delta_trans_hat = delta_trans - 
-              pf_ran_gaussian(sqrt(this->alpha3*delta_trans*delta_trans +
-                                   this->alpha4*delta_rot1_noise*delta_rot1_noise +
-                                   this->alpha4*delta_rot2_noise*delta_rot2_noise));
-      delta_rot2_hat = angle_diff(delta_rot2,
-                                  pf_ran_gaussian(sqrt(this->alpha1*delta_rot2_noise*delta_rot2_noise +
-                                                       this->alpha2*delta_trans*delta_trans)));
+      delta_rot1_hat = angle_diff(delta_rot1, pf_ran_gaussian(std_rot_1));
+      delta_trans_hat = delta_trans - pf_ran_gaussian(std_trans);
+      delta_rot2_hat = angle_diff(delta_rot2, pf_ran_gaussian(std_rot_2));
 
       // Apply sampled update to particle pose
       sample->pose.v[0] += delta_trans_hat * 

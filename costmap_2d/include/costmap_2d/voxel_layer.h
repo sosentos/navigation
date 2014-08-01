@@ -55,6 +55,7 @@
 #include <costmap_2d/obstacle_layer.h>
 #include <voxel_grid/voxel_grid.h>
 #include <vector>
+#include <map>
 
 namespace costmap_2d
 {
@@ -81,26 +82,37 @@ public:
   std::vector<ObstaclePoint> indices;
 };
 
+typedef pair<int, int> ind_t; 
+/*class TimePoint {
+   double last_time; 
+   int x, int y;
+
+ TimePoint(double last_time_, int x_, int y_):last_time(last_time_),x(x_), y(y_)
+   {}
+   };*/
+
 //keeps track of the last time each index location was updated
 class GridmapLocations
 {
 public:
 
-  double *last_utimes;
-  int size;
+  //double *last_utimes;
+  map<ind_t, double> last_times;
+  //int size;
 
   GridmapLocations(int size_=0) :
-    size(size_),
-    last_utimes(0)
+  //size(size_),
+  //last_utimes(0), last_locations(0)
   {
-    if(size > 0)
+    /*if(size > 0)
     {
       last_utimes = new double[size];
+      last_locations = 
       reset();
-    }
+      }*/
   }
 
-  void resize(int new_size)
+  /*void resize(int new_size)
   {
     if(size != new_size)
     {
@@ -110,7 +122,7 @@ public:
       last_utimes = new double[size];
     }
     reset();
-  }
+    }*/
 
   int countValid()
   {

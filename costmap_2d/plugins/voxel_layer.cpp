@@ -203,6 +203,8 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
         //keep track of which indexs we updated
         if(clear_old_)
         {
+	  //converts to map values when within legal bounds 
+	  //worldToMap(double wx, double wy, unsigned int& mx, unsigned int& my)
           cm_list.indices.push_back(ObstaclePoint(index, (double)cloud.points[i].x, (double)cloud.points[i].y));
           locations_utime_[index] = obs_ts;
           count++;

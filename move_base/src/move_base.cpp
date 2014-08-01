@@ -900,7 +900,7 @@ namespace move_base {
 
         //check to see if we've reached our goal
         if(tc_->isGoalReached()){
-          ROS_DEBUG_NAMED("move_base", "Goal reached!");
+          ROS_DEBUG_NAMED("move_base","Goal reached!");
           resetState();
 
           //disable the planner thread
@@ -924,51 +924,51 @@ namespace move_base {
         {
          boost::unique_lock< boost::shared_mutex > lock(*(controller_costmap_ros_->getCostmap()->getLock()));
         
-	  if(tc_->computeVelocityCommands(cmd_vel)){
-	    ROS_DEBUG_NAMED( "move_base", "Got a valid command from the local planner: %.3lf, %.3lf, %.3lf",
-			     cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z );
-	    last_valid_control_ = ros::Time::now();
-	    //make sure that we send the velocity command to the base
-	    
-	    if(tc_->isRotatingToGoal()){
-	      //turn off the global planner - we don't need it anymore 
-	      //disable the planner thread
-	      boost::unique_lock<boost::mutex> lock(planner_mutex_);
-	      if(runPlanner_){
-		//Robot turning towards goal - stopping global planner thread
-		runPlanner_ = false;
-	      }
-	      lock.unlock();
-	    }
+        if(tc_->computeVelocityCommands(cmd_vel)){
+          ROS_DEBUG_NAMED( "move_base", "Got a valid command from the local planner: %.3lf, %.3lf, %.3lf",
+                           cmd_vel.linear.x, cmd_vel.linear.y, cmd_vel.angular.z );
+          last_valid_control_ = ros::Time::now();
+          //make sure that we send the velocity command to the base
+          
+          if(tc_->isRotatingToGoal()){
+            //turn off the global planner - we don't need it anymore 
+            //disable the planner thread
+            boost::unique_lock<boost::mutex> lock(planner_mutex_);
+            if(runPlanner_){
+      	        //Robot turning towards goal - stopping global planner thread
+                runPlanner_ = false;
+            }
+            lock.unlock();
+          }
 
-	    vel_pub_.publish(cmd_vel);
-	    if(recovery_trigger_ == CONTROLLING_R)
-	      recovery_index_ = 0;
-	  }
-	  else {
-	    ROS_DEBUG_NAMED("move_base", "The local planner could not find a valid plan.");
-	    ros::Time attempt_end = last_valid_control_ + ros::Duration(controller_patience_);
-	   
-	    //check if we've tried to find a valid control for longer than our time limit
-	    if(ros::Time::now() > attempt_end){
-	      //we'll move into our obstacle clearing mode
-	      publishZeroVelocity();
-	      state_ = CLEARING;
-	      recovery_trigger_ = CONTROLLING_R;
-	    }
-	    else{
-	      //otherwise, if we can't find a valid control, we'll go back to planning
-	      last_valid_plan_ = ros::Time::now();
-	      state_ = PLANNING;
-	      publishZeroVelocity();
+          vel_pub_.publish(cmd_vel);
+          if(recovery_trigger_ == CONTROLLING_R)
+            recovery_index_ = 0;
+        }
+        else {
+          ROS_DEBUG_NAMED("move_base", "The local planner could not find a valid plan.");
+          ros::Time attempt_end = last_valid_control_ + ros::Duration(controller_patience_);
 
-	      //enable the planner thread in case it isn't running on a clock
-	      boost::unique_lock<boost::mutex> lock(planner_mutex_);
-	      runPlanner_ = true;
-	      planner_cond_.notify_one();
-	      lock.unlock();
-	    }
-	  }
+          //check if we've tried to find a valid control for longer than our time limit
+          if(ros::Time::now() > attempt_end){
+            //we'll move into our obstacle clearing mode
+            publishZeroVelocity();
+            state_ = CLEARING;
+            recovery_trigger_ = CONTROLLING_R;
+          }
+          else{
+            //otherwise, if we can't find a valid control, we'll go back to planning
+            last_valid_plan_ = ros::Time::now();
+            state_ = PLANNING;
+            publishZeroVelocity();
+
+            //enable the planner thread in case it isn't running on a clock
+            boost::unique_lock<boost::mutex> lock(planner_mutex_);
+            runPlanner_ = true;
+            planner_cond_.notify_one();
+            lock.unlock();
+          }
+        }
         }
 
         break;

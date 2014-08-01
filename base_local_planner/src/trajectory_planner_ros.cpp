@@ -434,7 +434,6 @@ namespace base_local_planner {
       //if the user wants to latch goal tolerance, if we ever reach the goal location, we'll
       //just rotate in place
       ROS_DEBUG("Turning in place : Dist to Goal : %f", getGoalPositionDistance(global_pose, goal_x, goal_y));
-
       if (latch_xy_goal_tolerance_) {
         xy_tolerance_latch_ = true;
       }
@@ -443,8 +442,6 @@ namespace base_local_planner {
       //check to see if the goal orientation has been reached
       if (fabs(angle) <= yaw_goal_tolerance_) {
         //set the velocity command to zero - reached the goal - setting the reached goal variable true
-	bool base_is_goal_reached = isGoalReached();
-
         cmd_vel.linear.x = 0.0;
         cmd_vel.linear.y = 0.0;
         cmd_vel.angular.z = 0.0;
@@ -455,32 +452,39 @@ namespace base_local_planner {
       else {
         //we need to call the next two lines to make sure that the trajectory
         //planner updates its path distance and goal distance grids
-	nav_msgs::Odometry base_odom;
-	odom_helper_.getOdom(base_odom);
-	bool stopped = false; 
-	stopped = base_local_planner::stopped(base_odom, rot_stopped_velocity_, trans_stopped_velocity_);
+        tc_->updatePlan(transformed_plan);
+        Trajectory path = tc_->findBestPath(global_pose, robot_vel, drive_cmds);
+        map_viz_.publishCostCloud(costmap_);
 
-	//we should update the plan if we are not rotating to goal
-	if(!rotating_to_goal_ && !stopped){ 
-	  //calculate command to stop the robot
-	  if ( ! stopWithAccLimits(global_pose, robot_vel, cmd_vel)) {
-	    //unable to stop within the given time 
-	    ROS_WARN("Local Planner : Unable to stop within given time");
-	    return false;
-	  }
-	}	
+        //copy over the odometry information
+        nav_msgs::Odometry base_odom;
+        odom_helper_.getOdom(base_odom);
+
+        //if we're not stopped yet... we want to stop... taking into account the acceleration limits of the robot
+        bool stopped = false; 
+        stopped = base_local_planner::stopped(base_odom, rot_stopped_velocity_, trans_stopped_velocity_);
+        if( ! rotating_to_goal_ && !stopped){ 
+          //calculate command to stop the robot
+          if ( ! stopWithAccLimits(global_pose, robot_vel, cmd_vel)) {
+	    //can't stop in time, command is all zeros 
+            ROS_WARN("Local Planner : Unable to stop within given time");
+            return false;
+          }
+        }
         //if we're stopped... then we want to rotate to goal
         else{
-          //once we have stoped moving in xy or if we are already rotating in place 
-	  //keep issuing rotate in place commands 
-	  if(rotating_to_goal_ || (!rotating_to_goal_ && stopped)){
-	    if(!rotateToGoal(global_pose, robot_vel, goal_th, cmd_vel)) {
-	      ROS_WARN("Failed to rotate to goal");
-	      return false;
-	    }
-	    rotating_to_goal_ = true;
-	  }
-	}
+          //once we have stopped moving in xy or if we are already rotating in place 
+          //keep issuing rotate in place commands 
+          if(rotating_to_goal_ || (!rotating_to_goal_ && stopped)){
+            rotating_to_goal_ = true;
+            if(!rotateToGoal(global_pose, robot_vel, goal_th, cmd_vel)) {
+	      //in this failure case, the planner will be called again to re-plan
+              ROS_WARN("Local Planner: Failed to rotate to goal");
+	      rotating_to_goal_ = false;
+              return false;
+            }
+          }
+        }
       }
 
       //publish an empty plan because we've reached our goal position
@@ -614,6 +618,7 @@ namespace base_local_planner {
       ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
       return false;
     }
+    //return our internal flag for whether we have reached the goal, so there isn't a discrepancy between this planner and move_base
     return reached_goal_;   
   }
 };

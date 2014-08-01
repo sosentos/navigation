@@ -58,67 +58,83 @@
 
 namespace costmap_2d
 {
-  class ObstaclePoint {
-  public:
-    unsigned int index;
-    double x; 
-    double y; 
+class ObstaclePoint
+{
+public:
+  unsigned int index;
+  double x;
+  double y;
 
-  ObstaclePoint(unsigned int index_, double x_, double y_):index(index_), x(x_), y(y_){}
-  };
+  ObstaclePoint(unsigned int index_, double x_, double y_) :
+    index(index_),
+    x(x_),
+    y(y_)
+  {
+  }
+};
 
-  //keeps track of the indices updated for each observation
-  class CostMapList {
-  public:
-    int64_t obs_timestamp; 
-    std::vector<ObstaclePoint> indices;
-  };
+//keeps track of the indices updated for each observation
+class CostMapList
+{
+public:
+  int64_t obs_timestamp;
+  std::vector<ObstaclePoint> indices;
+};
 
-  //keeps track of the last time each index location was updated 
-  class GridmapLocations {
-  public:
+//keeps track of the last time each index location was updated
+class GridmapLocations
+{
+public:
 
-    double *last_utimes;
-    int size;
+  double *last_utimes;
+  int size;
 
-  GridmapLocations(int size_=0):size(size_), last_utimes(0){
-      if(size > 0){
-	last_utimes = new double[size];
-	reset();
-      }
-    }
-
-    void resize(int new_size){
-      if(size != new_size){
-	size = new_size; 
-	if(last_utimes)
-	  delete []last_utimes;
-	last_utimes = new double[size];
-      }
+  GridmapLocations(int size_=0) :
+    size(size_),
+    last_utimes(0)
+  {
+    if(size > 0)
+    {
+      last_utimes = new double[size];
       reset();
     }
+  }
 
-    int countValid(){
-      int valid_count = 0; 
-      for(int i=0; i < size; i++){
-	if(last_utimes[i] != -1){
-	  valid_count++;
-	}	
-      }
-      return valid_count;
+  void resize(int new_size)
+  {
+    if(size != new_size)
+    {
+      size = new_size;
+      if(last_utimes)
+        delete []last_utimes;
+      last_utimes = new double[size];
     }
-    
-    double& operator[](int ind){
-      assert(ind >=0 && ind < size); 
-      return last_utimes[ind]; 
-    } 
+    reset();
+  }
 
-    void reset(){
-      for(int i=0; i < size; i++){
-	last_utimes[i] = -1;
-      }
+  int countValid()
+  {
+    int valid_count = 0;
+    for(int i=0; i < size; i++)
+    {
+      if(last_utimes[i] != -1)
+        valid_count++;
     }
-  };
+    return valid_count;
+  }
+
+  double& operator[](int ind)
+  {
+    assert(ind >=0 && ind < size);
+    return last_utimes[ind];
+  }
+
+  void reset()
+  {
+    for(int i=0; i < size; i++)
+      last_utimes[i] = -1;
+  }
+};
 
 class VoxelLayer : public ObstacleLayer
 {
@@ -148,8 +164,7 @@ protected:
   virtual void setupDynamicReconfigure(ros::NodeHandle& nh);
 
 private:
-  void resetOldCosts(double* min_x, double* min_y, 
-		     double* max_x, double* max_y); 
+  void resetOldCosts(double* min_x, double* min_y, double* max_x, double* max_y); 
 
   void reconfigureCB(costmap_2d::VoxelPluginConfig &config, uint32_t level);
   void clearNonLethal(double wx, double wy, double w_size_x, double w_size_y, bool clear_no_info);
@@ -158,8 +173,8 @@ private:
 
   dynamic_reconfigure::Server<costmap_2d::VoxelPluginConfig> *dsrv_;
 
-  std::vector<CostMapList> new_obs_list; 
-  GridmapLocations locations_utime;
+  std::vector<CostMapList> new_obs_list_;
+  GridmapLocations locations_utime_;
 
   double inflation_radius_;
   bool publish_voxel_;

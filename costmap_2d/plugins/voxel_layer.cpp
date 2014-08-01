@@ -22,9 +22,6 @@ void VoxelLayer::onInitialize()
   ros::NodeHandle private_nh("~/" + name_);
 
   private_nh.param("publish_voxel_map", publish_voxel_, false);
-
-  private_nh.param("inflation_radius", inflation_radius_, 0.4);
-  ROS_WARN("Inflation radius : %f", inflation_radius_);
   if (publish_voxel_)
     voxel_pub_ = private_nh.advertise < costmap_2d::VoxelGrid > ("voxel_grid", 1);
 
@@ -55,19 +52,13 @@ void VoxelLayer::reconfigureCB(costmap_2d::VoxelPluginConfig &config, uint32_t l
   unknown_threshold_ = config.unknown_threshold + (VOXEL_BITS - size_z_);
   mark_threshold_ = config.mark_threshold;
   combination_method_ = config.combination_method;
-  clear_old_ = !rolling_window_ && config.clear_old; 
-
+  clear_old_ = !rolling_window_ && config.clear_old;
   inflation_radius_ = config.inflation_radius;
-  ROS_WARN("Inflation radius : %f", inflation_radius_);
+  max_obstacle_persistance_ = config.max_obstacle_persistance;
 
-  if(clear_old_)
-    ROS_INFO("Clearing old obstacles : %d - Rolling %d", config.clear_old, rolling_window_);
-
-  if(config.clear_old && rolling_window_){
+  if(config.clear_old && rolling_window_)
     ROS_WARN("Unable to clear old obstacles for maps with a rolling window");
-  }
 
-  max_obstacle_persistance_ = config.max_obstacle_persistance; 
   matchSize();
 }
 
@@ -76,9 +67,8 @@ void VoxelLayer::matchSize()
   ObstacleLayer::matchSize();
   voxel_grid_.resize(size_x_, size_y_, size_z_);
   ROS_ASSERT(voxel_grid_.sizeX() == size_x_ && voxel_grid_.sizeY() == size_y_);
-  if(clear_old_){
-    locations_utime.resize(voxel_grid_.sizeX() * voxel_grid_.sizeY());
-  }
+  if(clear_old_)
+    locations_utime_.resize(voxel_grid_.sizeX() * voxel_grid_.sizeY());
 }
 
 void VoxelLayer::reset()
@@ -86,40 +76,42 @@ void VoxelLayer::reset()
   deactivate();
   resetMaps();
   voxel_grid_.reset();
-  if(clear_old_){
-    locations_utime.reset();
-  }
+  if(clear_old_)
+    locations_utime_.reset();
+
   activate();
 }
 
 void VoxelLayer::resetOldCosts(double* min_x, double* min_y, 
-			       double* max_x, double* max_y){
-  //removes any obstacles that were put down based on sensor observation when the timer expires 
+                               double* max_x, double* max_y)
+{
+  //removes any obstacles that were put down based on sensor observation when the timer expires
   double current_time = ros::Time::now().toSec();
+  int checked_count = 0;
 
-  int total_size = new_obs_list.size();
-  int checked_count = 0; 
-
-  int error_count = 0; 
-  for(int i=0; i < new_obs_list.size(); i++){
-    CostMapList &list = new_obs_list[i];
-    if((current_time - list.obs_timestamp / 1.0e6) > max_obstacle_persistance_){
-      int cleared_count = 0;
+  for(int i=0; i < new_obs_list_.size(); i++)
+  {
+    CostMapList &list = new_obs_list_[i];
+    if((current_time - list.obs_timestamp / 1.0e6) > max_obstacle_persistance_)
+    {
       checked_count++;
-      for(int j=0; j < list.indices.size(); j++){
-	if(locations_utime[list.indices[j].index] == list.obs_timestamp / 1.0e6){
-	  costmap_[list.indices[j].index] = FREE_SPACE; 
-	  locations_utime[list.indices[j].index] = -1;
-	  //increase the map update bounds 
-	  touch(list.indices[j].x, list.indices[j].y, min_x, min_y, max_x, max_y);
-	}
+      for(int j=0; j < list.indices.size(); j++)
+      {
+        if(locations_utime_[list.indices[j].index] == list.obs_timestamp / 1.0e6)
+        {
+          costmap_[list.indices[j].index] = FREE_SPACE;
+          locations_utime_[list.indices[j].index] = -1;
+          //increase the map update bounds
+          touch(list.indices[j].x, list.indices[j].y, min_x, min_y, max_x, max_y);
+        }
       }
     }
-    else{
+    else
+    {
       //remove the costmap_list upto (and not including this)
-      if(i > 0){
-	new_obs_list.erase(new_obs_list.begin(), new_obs_list.begin() + (i-1));
-      }
+      if(i > 0)
+        new_obs_list_.erase(new_obs_list_.begin(), new_obs_list_.begin() + (i-1));
+      
       break;
     }
   }
@@ -137,10 +129,9 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
   bool current = true;
   std::vector<Observation> observations, clearing_observations;
 
-  if(clear_old_){
+  if(clear_old_)
     resetOldCosts(min_x, min_y, max_x, max_y);
-  }
-
+  
   //get the marking observations
   current = current && getMarkingObservations(observations);
 
@@ -155,7 +146,7 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
   {
     raytraceFreespace(clearing_observations[i], min_x, min_y, max_x, max_y);
   }
-   
+
   //place the new obstacles into a priority queue... each with a priority of zero to begin with
   for (std::vector<Observation>::const_iterator it = observations.begin(); it != observations.end(); ++it)
   {
@@ -204,21 +195,23 @@ void VoxelLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, 
       if (voxel_grid_.markVoxelInMap(mx, my, mz, mark_threshold_))
       {
         unsigned int index = getIndex(mx, my);
-	//these are the ones set as occupied 
-	costmap_[index] = LETHAL_OBSTACLE;
-	touch((double)cloud.points[i].x, (double)cloud.points[i].y, min_x, min_y, max_x, max_y);
 
-	//keep track of which indexs we updated 
-	if(clear_old_){
-	  cm_list.indices.push_back(ObstaclePoint(index, (double)cloud.points[i].x, (double)cloud.points[i].y));
-	  locations_utime[index] = obs_ts; 
-	  count++;
-	}
+        //these are the ones set as occupied
+        costmap_[index] = LETHAL_OBSTACLE;
+        touch((double)cloud.points[i].x, (double)cloud.points[i].y, min_x, min_y, max_x, max_y);
+
+        //keep track of which indexs we updated
+        if(clear_old_)
+        {
+          cm_list.indices.push_back(ObstaclePoint(index, (double)cloud.points[i].x, (double)cloud.points[i].y));
+          locations_utime_[index] = obs_ts;
+          count++;
+        }
       }
     }
-    if(clear_old_ && count > 0){
-      new_obs_list.push_back(cm_list);
-    }
+
+    if(clear_old_ && count > 0)
+      new_obs_list_.push_back(cm_list);
   }
 
   if(clear_old_){
@@ -431,9 +424,9 @@ void VoxelLayer::updateOrigin(double new_origin_x, double new_origin_y)
   cell_ox = int((new_origin_x - origin_x_) / resolution_);
   cell_oy = int((new_origin_y - origin_y_) / resolution_);
 
-  if(cell_ox == 0 && cell_oy == 0){
+  if(cell_ox == 0 && cell_oy == 0)
     return;
-  } 
+   
 
   //compute the associated world coordinates for the origin cell
   //beacuase we want to keep things grid-aligned

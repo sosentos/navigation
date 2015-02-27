@@ -183,6 +183,10 @@ if(CATKIN_ENABLE_TESTING)
   add_dependencies(tests inflation_tests)
   target_link_libraries(inflation_tests costmap_2d layers ${GTEST_LIBRARIES})
 
+  add_executable(voxel_tests EXCLUDE_FROM_ALL test/voxel_tests.cpp)
+  add_dependencies(tests voxel_tests)
+  target_link_libraries(voxel_tests costmap_2d layers ${GTEST_LIBRARIES})
+
   catkin_download_test_data(${PROJECT_NAME}_simple_driving_test_indexed.bag
     http://download.ros.org/data/costmap_2d/simple_driving_test_indexed.bag
     DESTINATION ${CATKIN_DEVEL_PREFIX}/${CATKIN_PACKAGE_SHARE_DESTINATION}/test
@@ -197,6 +201,7 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest(test/obstacle_tests.launch)
   add_rostest(test/simple_driving_test.xml)
   add_rostest(test/static_tests.launch)
+  add_rostest(test/voxel_tests.launch)
 
   catkin_add_gtest(array_parser_test test/array_parser_test.cpp)
   target_link_libraries(array_parser_test costmap_2d)
